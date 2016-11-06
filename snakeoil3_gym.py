@@ -64,6 +64,16 @@ PI= 3.14159265359
 
 data_size = 2**17
 
+def prRed(prt):         print("\033[91m{}\033[00m" .format(prt))
+def prGreen(prt):       print("\033[92m{}\033[00m" .format(prt))
+def prYellow(prt):      print("\033[93m{}\033[00m" .format(prt))
+def prLightPurple(prt): print("\033[94m{}\033[00m" .format(prt))
+def prPurple(prt):      print("\033[95m{}\033[00m" .format(prt))
+def prCyan(prt):        print("\033[96m{}\033[00m" .format(prt))
+def prLightGray(prt):   print("\033[97m{}\033[00m" .format(prt))
+def prBlack(prt):       print("\033[98m{}\033[00m" .format(prt))
+
+
 # Initialize help messages
 ophelp=  u'Options:\n'
 ophelp+= u' --host, -H <host>    TORCS server host. [localhost]\n'
@@ -270,6 +280,7 @@ class Client(object):
                 break # Can now return from this function.
 
     def respond_to_server(self):
+        # print("respond_to_server")
         if not self.so: return
         try:
             message = repr(self.R)

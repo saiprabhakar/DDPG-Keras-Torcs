@@ -15,10 +15,17 @@ from ActorNetwork import ActorNetwork
 from CriticNetwork import CriticNetwork
 from OU import OU
 import timeit
+import ipdb
 
 OU = OU()       #Ornstein-Uhlenbeck Process
 
-def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
+save_id = 1
+preprocess_state = False
+vision = False
+
+model_flag = ""
+
+def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
     BUFFER_SIZE = 100000
     BATCH_SIZE = 32
     GAMMA = 0.99
@@ -31,11 +38,11 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
 
     np.random.seed(1337)
 
-    vision = False
 
     EXPLORE = 100000.
     episode_count = 2000
     max_steps = 100000
+    # max_steps = 1000
     reward = 0
     done = False
     step = 0
@@ -49,14 +56,16 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
     from keras import backend as K
     K.set_session(sess)
 
-    actor = ActorNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRA)
-    critic = CriticNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRC)
+    actor = ActorNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRA, preprocess_state=preprocess_state, vision=vision)
+    critic = CriticNetwork(sess, state_dim, action_dim, BATCH_SIZE, TAU, LRC, preprocess_state=preprocess_state, vision=vision)
     buff = ReplayBuffer(BUFFER_SIZE)    #Create replay buffer
 
     # Generate a Torcs environment
     env = TorcsEnv(vision=vision, throttle=True,gear_change=False)
 
+
     #Now load the weight
+    # ipdb.set_trace()
     print("Now we load the weight")
     try:
         actor.model.load_weights("actormodel.h5")
@@ -67,6 +76,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
     except:
         print("Cannot find the weight")
 
+    total_rewards = []
     print("TORCS Experiment Start.")
     for i in range(episode_count):
 
@@ -77,7 +87,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
         else:
             ob = env.reset()
 
-        s_t = np.hstack((ob.angle, ob.track, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm))
+        s_t = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track)) 
      
         total_reward = 0.
         for j in range(max_steps):
@@ -92,9 +102,9 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             noise_t[0][2] = train_indicator * max(epsilon, 0) * OU.function(a_t_original[0][2], -0.1 , 1.00, 0.05)
 
             #The following code do the stochastic brake
-            #if random.random() <= 0.1:
-            #    print("********Now we apply the brake***********")
-            #    noise_t[0][2] = train_indicator * max(epsilon, 0) * OU.function(a_t_original[0][2],  0.2 , 1.00, 0.10)
+            if random.random() <= 0.1:
+               # print("********Now we apply the brake***********")
+               noise_t[0][2] = train_indicator * max(epsilon, 0) * OU.function(a_t_original[0][2],  0.2 , 1.00, 0.10)
 
             a_t[0][0] = a_t_original[0][0] + noise_t[0][0]
             a_t[0][1] = a_t_original[0][1] + noise_t[0][1]
@@ -134,7 +144,7 @@ def playGame(train_indicator=0):    #1 means Train, 0 means simply Run
             total_reward += r_t
             s_t = s_t1
         
-            print("Episode", i, "Step", step, "Action", a_t, "Reward", r_t, "Loss", loss)
+            # print("Episode", i, "Step", step, "Action", a_t, "Reward", r_t, "Loss", loss)
         
             step += 1
             if done:
