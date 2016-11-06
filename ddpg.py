@@ -20,7 +20,7 @@ import ipdb
 OU = OU()       #Ornstein-Uhlenbeck Process
 
 save_id = 1
-preprocess_state = False
+preprocess_state = True
 vision = False
 
 model_flag = ""
