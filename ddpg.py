@@ -1,3 +1,8 @@
+#!/usr/bin/env python -W ignore::WARNING
+
+import logging
+logging.getLogger("tensorflow").setLevel(logging.ERROR)#WARNING)
+
 from gym_torcs import TorcsEnv
 import numpy as np
 import random
@@ -6,7 +11,9 @@ from keras.models import model_from_json, Model
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.optimizers import Adam
+import keras.backend as K
 import tensorflow as tf
+K.set_learning_phase(1)
 from keras.engine.training import collect_trainable_weights
 import json
 
@@ -15,13 +22,20 @@ from ActorNetwork import ActorNetwork
 from CriticNetwork import CriticNetwork
 from OU import OU
 import timeit
-import ipdb
+#import ipdb
+
+import matplotlib.pyplot as plt
+plt.ion()
 
 OU = OU()       #Ornstein-Uhlenbeck Process
 
 save_id = 1
-preprocess_state = False
-vision = False
+#preprocess_state = False
+preprocess_state = True
+#vision = False
+vision = True
+#vision_env = False
+vision_env = True
 
 model_flag = ""
 
@@ -34,7 +48,10 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
     LRC = 0.001     #Lerning rate for Critic
 
     action_dim = 3  #Steering/Acceleration/Brake
-    state_dim = 29  #of sensors input
+    if vision == False:
+        state_dim = 29  #of sensors input
+    else:
+        state_dim = 29 + 64*64*3
 
     np.random.seed(1337)
 
@@ -61,7 +78,7 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
     buff = ReplayBuffer(BUFFER_SIZE)    #Create replay buffer
 
     # Generate a Torcs environment
-    env = TorcsEnv(vision=vision, throttle=True,gear_change=False)
+    env = TorcsEnv(vision=vision_env, throttle=True,gear_change=False)
 
 
     #Now load the weight
@@ -86,9 +103,17 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
             ob = env.reset(relaunch=True)   #relaunch TORCS every 3 episode because of the memory leak error
         else:
             ob = env.reset()
+        #ipdb.set_trace()
 
-        s_t = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track)) 
-     
+        #print ob.angle, ob.trackPos, ob.speedX, ob.wheelSpinVel
+        #TODO make this into a function
+        if vision == False:
+            s_t = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track)) 
+        else:
+            s_t = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track, np.reshape(ob.img, ob.img.size) )) 
+        #ob.img -> shape 64,64,3
+            
+            
         total_reward = 0.
         for j in range(max_steps):
             loss = 0 
@@ -111,9 +136,23 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
             a_t[0][2] = a_t_original[0][2] + noise_t[0][2]
 
             ob, r_t, done, info = env.step(a_t[0])
+            print "reward :", r_t, "speed :" , ob.speedX, " " ,ob.speedY, " angle :", ob.angle
 
-            s_t1 = np.hstack((ob.angle, ob.track, ob.trackPos, ob.speedX, ob.speedY, ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm))
-        
+
+            #TODO make this into a function
+            # np.transpose( ob.img, (2,0,1))
+            #ob.img = np.transpose(ob.img, (
+            if vision == False:
+                s_t1 = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track)) 
+            else:
+                s_t1 = np.hstack((ob.angle, ob.trackPos, ob.speedX, ob.speedY,  ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm, ob.track, np.reshape(ob.img, ob.img.size) )) 
+            #s_t1 = np.hstack((ob.angle, ob.track, ob.trackPos, ob.speedX, ob.speedY, ob.speedZ, ob.wheelSpinVel/100.0, ob.rpm))
+            #plt.clf()
+            #plt.imshow(ob.img, interpolation='nearest')
+            #plt.pause(0.05)
+            #import IPython
+            #IPython.embed()
+
             buff.add(s_t, a_t[0], r_t, s_t1, done)      #Add replay buffer
             
             #Do the batch update
@@ -150,15 +189,15 @@ def playGame(train_indicator=1):    #1 means Train, 0 means simply Run
             if done:
                 break
 
-        if np.mod(i, 3) == 0:
+        if np.mod(i, 30) == 0 and i != 0:
             if (train_indicator):
                 print("Now we save model")
-                actor.model.save_weights("actormodel.h5", overwrite=True)
-                with open("actormodel.json", "w") as outfile:
+                actor.model.save_weights("actormodel_"+str(i)+".h5", overwrite=True)
+                with open("actormodel_"+str(i)+".json", "w") as outfile:
                     json.dump(actor.model.to_json(), outfile)
 
-                critic.model.save_weights("criticmodel.h5", overwrite=True)
-                with open("criticmodel.json", "w") as outfile:
+                critic.model.save_weights("criticmodel_"+str(i)+".h5", overwrite=True)
+                with open("criticmodel_"+str(i)+".json", "w") as outfile:
                     json.dump(critic.model.to_json(), outfile)
 
         print("TOTAL REWARD @ " + str(i) +"-th Episode  : Reward " + str(total_reward))

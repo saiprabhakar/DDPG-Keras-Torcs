@@ -9,7 +9,6 @@ import collections as col
 import os
 import time
 
-
 def prRed(prt):         print("\033[91m{}\033[00m" .format(prt))
 def prGreen(prt):       print("\033[92m{}\033[00m" .format(prt))
 def prYellow(prt):      print("\033[93m{}\033[00m" .format(prt))
@@ -117,7 +116,7 @@ class TorcsEnv:
                 action_torcs['accel'] -= .2
         else:
             action_torcs['accel'] = this_action['accel']
-            action_torcs['brake'] = this_action['brake']
+            # action_torcs['brake'] = this_action['brake']
 
         #  Automatic Gear Change by Snakeoil
         if self.gear_change is True:
@@ -149,8 +148,6 @@ class TorcsEnv:
 
         # Get the current full-observation from torcs
         obs = client.S.d
-        #import IPython
-        #IPython.embed()
 
         # Make an obsevation from a raw observation vector from TORCS
         self.observation = self.make_observaton(obs)
@@ -160,12 +157,10 @@ class TorcsEnv:
         track = np.array(obs['track'])
         trackPos = np.array(obs['trackPos'])
         sp = np.array(obs['speedX'])
-        spy = np.array(obs['speedY'])
         damage = np.array(obs['damage'])
         rpm = np.array(obs['rpm'])
 
-        progress = sp*np.cos(obs['angle']) + spy*np.sin(obs['angle']) - np.abs(spy*np.cos(obs['angle']) - sp*np.sin(obs['angle'])) - sp*np.cos(obs['angle'])*np.abs(obs['trackPos'])
-        #progress = sp*np.cos(obs['angle']) - np.abs(spy*np.sin(obs['angle'])) - sp * np.abs(obs['trackPos'])
+        progress = sp*np.cos(obs['angle']) - np.abs(sp*np.sin(obs['angle'])) - sp * np.abs(obs['trackPos'])
         # progress = sp*np.cos(obs['angle'])
         reward = progress
 
